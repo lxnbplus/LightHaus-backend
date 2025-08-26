@@ -7,11 +7,13 @@ import com.qcloud.cos.model.GetObjectRequest;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.PicOperations;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
 
+@Slf4j
 @Component
 public class CosManager {  
   
@@ -53,6 +55,15 @@ public class CosManager {
      * @param file 文件
      */
     public PutObjectResult putPictureObject(String key, File file) {
+        log.info("[COS] putPictureObject key={}", key);
+
+        // 进一步：确认是谁调用了它（哪条栈过来的）
+        for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+            if (ste.getClassName().startsWith("com.lx")) { // 你的包名前缀
+                log.info("[COS] caller -> {}#{}:{}", ste.getClassName(), ste.getMethodName(), ste.getLineNumber());
+            }
+        }
+
         PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key,
                 file);
         // 对图片进行处理（获取基本信息也被视作为一种处理）
