@@ -1,24 +1,21 @@
 package com.lx.lighthausbackend.manager.upload;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.RandomUtil;
-import cn.hutool.core.util.StrUtil;
 import com.lx.lighthausbackend.config.CosClientConfig;
 import com.lx.lighthausbackend.exception.BusinessException;
 import com.lx.lighthausbackend.exception.ErrorCode;
 import com.lx.lighthausbackend.manager.CosManager;
 import com.lx.lighthausbackend.model.dto.file.UploadPictureResult;
 import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.ciModel.persistence.CIObject;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
+import com.qcloud.cos.model.ciModel.persistence.ProcessResults;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
 import java.io.File;
-import java.util.Arrays;
-import java.util.Date;
+import java.util.List;
 
 /**
  * 图片上传模版（抽象类）
@@ -34,49 +31,71 @@ public abstract class PictureUploadTemplate {
   
     /**  
      * 模板方法，定义上传流程  
-     */  
+     */
+    // com.lx.lighthausbackend.manager.upload.PictureUploadTemplate
+
     public final UploadPictureResult uploadPicture(Object inputSource, String uploadPathPrefix) {
-        // 1. 校验图片  
-        validPicture(inputSource);  
-  
-        // 2. 图片上传地址  
-        String uuid = RandomUtil.randomString(16);
+        // 1. 校验输入
+        validPicture(inputSource);
+
+        // 2. 生成文件名/后缀（保留兜底 png 策略）
+        String uuid = cn.hutool.core.util.RandomUtil.randomString(16);
         String originFilename = getOriginFilename(inputSource);
-        String suffix = FileUtil.getSuffix(originFilename);
+        String suffix = cn.hutool.core.io.FileUtil.getSuffix(originFilename);
         log.info("[TEMPLATE] originFilename={}, suffix(before)={}", originFilename, suffix);
-        if (StrUtil.isBlank(suffix) ||
-                !CollUtil.contains(Arrays.asList("jpg", "jpeg", "png", "webp"), suffix.toLowerCase())) {
-            // 点后不是合法扩展名，统一兜底为 png
+        if (cn.hutool.core.util.StrUtil.isBlank(suffix)
+                || !cn.hutool.core.collection.CollUtil.contains(
+                java.util.Arrays.asList("jpg", "jpeg", "png", "webp"),
+                suffix.toLowerCase())) {
             suffix = "png";
         }
-        String uploadFilename = String.format("%s_%s.%s", DateUtil.formatDate(new Date()), uuid,
-                suffix);
-        String uploadPath = String.format("/%s/%s", uploadPathPrefix, uploadFilename);
-        // 标出当前使用的是哪个实现类 + 最终 key
-        log.info("[TEMPLATE] impl={}, final uploadPath={}",
-                this.getClass().getName(), uploadPath);
 
-        File file = null;  
-        try {  
-            // 3. 创建临时文件  
-            file = File.createTempFile(uploadPath, null);
-            // 处理文件来源（本地或 URL）  
-            processFile(inputSource, file);  
-  
-            // 4. 上传图片到对象存储  
-            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
-            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
-  
-            // 5. 封装返回结果  
-            return buildResult(originFilename, file, uploadPath, imageInfo);  
-        } catch (Exception e) {  
-            log.error("图片上传到对象存储失败", e);  
+        // 原图 key（CosManager 内会生成 webp + thumbnail，并在成功后删除原图）
+        String baseName  = cn.hutool.core.date.DateUtil.formatDate(new java.util.Date()) + "_" + uuid;
+        String uploadKey = String.format("/%s/%s.%s", uploadPathPrefix, baseName, suffix);
+        log.info("[TEMPLATE] impl={}, rawKey={}", this.getClass().getName(), uploadKey);
+
+        File file = null;
+        try {
+            // 3. 创建临时文件 & 写入（本地或 URL）
+            file = File.createTempFile(baseName, null);
+            processFile(inputSource, file);
+
+            // 4. 上传到 COS（CosManager：生成 webp + thumbnail，并确认后删除原图）
+            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadKey, file);
+
+            // 5. 解析处理结果（严格按你示例的写法）
+            ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
+            List<CIObject> objectList = processResults.getObjectList();
+            if (cn.hutool.core.collection.CollUtil.isNotEmpty(objectList)) {
+                CIObject compressedCiObject = objectList.get(0);   // webp
+                CIObject thumbnailCiObject  = objectList.size() > 1 ? objectList.get(1) : null; // 缩略图
+
+                UploadPictureResult result = buildResult(originFilename, compressedCiObject, thumbnailCiObject);
+
+                // 回填 originUrl（即使原图被删除，也仅作为来源记录）
+                result.setOriginUrl(cosClientConfig.getHost() + "/" + uploadKey);
+                return result;
+            }
+
+            // 6. 如果没有返回处理结果，兜底：用原图信息封装
+            ImageInfo imageInfo = null;
+            if (putObjectResult.getCiUploadResult() != null
+                    && putObjectResult.getCiUploadResult().getOriginalInfo() != null) {
+                imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            }
+            UploadPictureResult fallback = buildResult(originFilename, file, uploadKey, imageInfo);
+            fallback.setOriginUrl(cosClientConfig.getHost() + "/" + uploadKey);
+            return fallback;
+
+        } catch (Exception e) {
+            log.error("图片上传到对象存储失败", e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-        } finally {  
-            // 6. 清理临时文件  
-            deleteTempFile(file);  
-        }  
-    }  
+        } finally {
+            // 7. 清理临时文件
+            deleteTempFile(file);
+        }
+    }
   
     /**  
      * 校验输入源（本地文件或 URL）  
@@ -91,8 +110,32 @@ public abstract class PictureUploadTemplate {
     /**  
      * 处理输入源并生成本地临时文件  
      */  
-    protected abstract void processFile(Object inputSource, File file) throws Exception;  
-  
+    protected abstract void processFile(Object inputSource, File file) throws Exception;
+
+    /**
+     * 封装返回结果
+     */
+    private UploadPictureResult buildResult(String originFilename,
+                                            CIObject compressedCiObject,
+                                            CIObject thumbnailCiObject) {
+        UploadPictureResult result = new UploadPictureResult();
+        result.setPicName(FileUtil.mainName(originFilename));
+
+        // 压缩图(webp)地址
+        result.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
+
+        // 原图地址（注意：可能已经删除，但数据库里保留）
+        result.setOriginUrl(cosClientConfig.getHost() + "/" + FileUtil.mainName(originFilename));
+
+        // 缩略图地址（可选字段，你可以加到 DTO / VO）
+        if (thumbnailCiObject != null) {
+            result.setThumbnailUrl(cosClientConfig.getHost() + "/" + thumbnailCiObject.getKey());
+        }
+
+        return result;
+    }
+
+
     /**  
      * 封装返回结果  
      */  

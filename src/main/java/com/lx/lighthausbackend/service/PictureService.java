@@ -10,6 +10,7 @@ import com.lx.lighthausbackend.model.dto.picture.PictureUploadRequest;
 import com.lx.lighthausbackend.model.entity.Picture;
 import com.lx.lighthausbackend.model.entity.User;
 import com.lx.lighthausbackend.model.vo.PictureVO;
+import org.springframework.scheduling.annotation.Async;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -94,4 +95,6 @@ public interface PictureService extends IService<Picture> {
             User loginUser
     );
 
+    @Async
+    void clearPictureFile(Picture oldPicture);
 }
