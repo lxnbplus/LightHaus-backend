@@ -3,10 +3,7 @@ package com.lx.lighthausbackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.lx.lighthausbackend.model.dto.picture.PictureQueryRequest;
-import com.lx.lighthausbackend.model.dto.picture.PictureReviewRequest;
-import com.lx.lighthausbackend.model.dto.picture.PictureUploadByBatchRequest;
-import com.lx.lighthausbackend.model.dto.picture.PictureUploadRequest;
+import com.lx.lighthausbackend.model.dto.picture.*;
 import com.lx.lighthausbackend.model.entity.Picture;
 import com.lx.lighthausbackend.model.entity.User;
 import com.lx.lighthausbackend.model.vo.PictureVO;
@@ -33,6 +30,10 @@ public interface PictureService extends IService<Picture> {
     PictureVO uploadPicture(Object inputSource,
                             PictureUploadRequest pictureUploadRequest,
                             User loginUser);
+
+    void deletePicture(long pictureId, User loginUser);
+
+    void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 
     /**
      * 获取查询条件
@@ -97,4 +98,13 @@ public interface PictureService extends IService<Picture> {
 
     @Async
     void clearPictureFile(Picture oldPicture);
+
+
+    /**
+     * 校验空间图片的权限
+     *
+     * @param loginUser
+     * @param picture
+     */
+    void checkPictureAuth(User loginUser, Picture picture);
 }

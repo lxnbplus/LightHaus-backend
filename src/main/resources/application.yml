@@ -6,6 +6,8 @@ server:
       cookie:
         max-age: 2592000
 spring:
+  profiles:
+    active: local
   application:
     name: LightHaus-backend
   # 数据库配置
