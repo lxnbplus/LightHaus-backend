@@ -71,7 +71,9 @@ public abstract class PictureUploadTemplate {
                 CIObject compressedCiObject = objectList.get(0);   // webp
                 CIObject thumbnailCiObject  = objectList.size() > 1 ? objectList.get(1) : null; // 缩略图
 
-                UploadPictureResult result = buildResult(originFilename, compressedCiObject, thumbnailCiObject);
+                // 获取imageInfo对象
+                ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+                UploadPictureResult result = buildResult(originFilename, compressedCiObject, thumbnailCiObject, imageInfo);
 
                 // 回填 originUrl（即使原图被删除，也仅作为来源记录）
                 result.setOriginUrl(cosClientConfig.getHost() + "/" + uploadKey);
@@ -117,9 +119,11 @@ public abstract class PictureUploadTemplate {
      */
     private UploadPictureResult buildResult(String originFilename,
                                             CIObject compressedCiObject,
-                                            CIObject thumbnailCiObject) {
+                                            CIObject thumbnailCiObject,ImageInfo imageInfo) {
         UploadPictureResult result = new UploadPictureResult();
         result.setPicName(FileUtil.mainName(originFilename));
+        result.setPicColor(imageInfo.getAve());
+
 
         // 压缩图(webp)地址
         result.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
@@ -148,7 +152,8 @@ public abstract class PictureUploadTemplate {
         uploadPictureResult.setPicWidth(picWidth);  
         uploadPictureResult.setPicHeight(picHeight);  
         uploadPictureResult.setPicScale(picScale);  
-        uploadPictureResult.setPicFormat(imageInfo.getFormat());  
+        uploadPictureResult.setPicFormat(imageInfo.getFormat());
+        uploadPictureResult.setPicColor(imageInfo.getAve());
         uploadPictureResult.setPicSize(FileUtil.size(file));  
         uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + uploadPath);  
         return uploadPictureResult;  
