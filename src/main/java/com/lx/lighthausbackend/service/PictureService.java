@@ -3,6 +3,7 @@ package com.lx.lighthausbackend.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.lx.lighthausbackend.api.aliyunai.model.CreateOutPaintingTaskResponse;
 import com.lx.lighthausbackend.model.dto.picture.*;
 import com.lx.lighthausbackend.model.entity.Picture;
 import com.lx.lighthausbackend.model.entity.User;
@@ -122,4 +123,6 @@ public interface PictureService extends IService<Picture> {
 
     @Transactional(rollbackFor = Exception.class)
     void editPictureByBatch(PictureEditByBatchRequest pictureEditByBatchRequest, User loginUser);
+
+    CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
 }
