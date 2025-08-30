@@ -37,7 +37,8 @@ import com.lx.lighthausbackend.model.vo.SpaceVO;
 import com.lx.lighthausbackend.service.SpaceService;
 import com.lx.lighthausbackend.service.UserService;
 
-import java.util.stream.Collectors;
+
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/space")
